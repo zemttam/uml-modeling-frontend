@@ -1,0 +1,27 @@
+:root {
+  --dashboard-hover: #f1f5f9;
+  --dashboard-danger: #dc2626;
+  --dashboard-danger-hover: #b91c1c;
+  --dashboard-dialog-overlay: rgba(0, 0, 0, 0.4);
+  --dashboard-dialog-bg: #ffffff;
+  --dashboard-dialog-text: #0f172a;
+  --dashboard-dialog-border: #cbd5e1;
+  --dashboard-dialog-input-bg: #ffffff;
+  --dashboard-dialog-input-text: #0f172a;
+  --dashboard-dialog-input-border: #cbd5e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dashboard-hover: #27272a;
+    --dashboard-danger: #dc2626;
+    --dashboard-danger-hover: #b91c1c;
+    --dashboard-dialog-overlay: rgba(0, 0, 0, 0.6);
+    --dashboard-dialog-bg: #18181b;
+    --dashboard-dialog-text: #fafafa;
+    --dashboard-dialog-border: #3f3f46;
+    --dashboard-dialog-input-bg: #27272a;
+    --dashboard-dialog-input-text: #fafafa;
+    --dashboard-dialog-input-border: #3f3f46;
+  }
+}

@@ -281,58 +281,25 @@ async function serverRequest(
   path: string,
   cookie?: string,
 ): Promise<Record<string, unknown> | null> {
-  const http = await import('http');
-  return new Promise((resolve) => {
-    const req = http.request(
-      {
-        host: new URL(API_URL).hostname,
-        port: new URL(API_URL).port,
-        path,
-        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => {
-          try {
-            resolve(
-              res.statusCode === 200 ? (JSON.parse(body) as Record<string, unknown>) : null,
-            );
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-    req.on('error', () => resolve(null));
-    req.end();
-  });
+    try {
+    const res = await fetch(`${API_URL}${path}`, {
+      headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      return null;
+    }
+
+    return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  } catch {
+    return null;
+  }
 }
 
 export async function apiMe(cookie?: string): Promise<string | null> {
-  const http = await import('http');
-  return new Promise((resolve) => {
-    const req = http.request(
-      {
-        host: new URL(API_URL).hostname,
-        port: new URL(API_URL).port,
-        path: '/auth/me',
-        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(body) as { username?: string };
-            resolve(res.statusCode === 200 ? data.username ?? null : null);
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-    req.on('error', () => resolve(null));
-    req.end();
-  });
+   const data = (await serverRequest('/auth/me', cookie)) as {
+    username?: string;
+  } | null;
+  return data?.username ?? null;
+
 }

@@ -6,6 +6,7 @@ export interface AuthResult {
   status: number;
   message?: string;
   username?: string;
+  token?: string;
   lastOpenedProjectId?: string | null;
 }
 
@@ -29,6 +30,22 @@ export interface ProjectListResult {
   status: number;
   message?: string;
   projects?: Project[];
+}
+
+// The API sets its session cookie on its own (cross-site) domain, so the
+// Next.js server components can never read it from the frontend origin.
+// Auth responses therefore also return the raw token, which the client
+// mirrors into this non-httpOnly cookie for server-side forwarding.
+export function setSessionCookie(token: string): void {
+  if (typeof document !== 'undefined') {
+    document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+  }
+}
+
+export function clearSessionCookie(): void {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'token=; path=/; max-age=0';
+  }
 }
 
 async function request<T>(
@@ -281,25 +298,23 @@ async function serverRequest(
   path: string,
   cookie?: string,
 ): Promise<Record<string, unknown> | null> {
-    try {
+  try {
     const res = await fetch(`${API_URL}${path}`, {
       headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
       cache: 'no-store',
     });
-    if (!res.ok) {
+    if (res.status !== 200) {
       return null;
     }
-
-    return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    return (await res.json()) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
 export async function apiMe(cookie?: string): Promise<string | null> {
-   const data = (await serverRequest('/auth/me', cookie)) as {
-    username?: string;
-  } | null;
+  const data = (await serverRequest('/auth/me', cookie)) as
+    | { username?: string }
+    | null;
   return data?.username ?? null;
-
 }

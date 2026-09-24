@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiSignup } from '@/lib/api';
+import { apiSignup, setSessionCookie } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n/language-context';
 import LanguageToggle from '@/components/language-toggle';
 
@@ -18,6 +18,9 @@ export default function SignupForm() {
     setError('');
     const result = await apiSignup(username, password);
     if (result.ok) {
+      if (result.token) {
+        setSessionCookie(result.token);
+      }
       router.push('/login?created=1');
       router.refresh();
     } else {

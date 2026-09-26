@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { apiLogout, clearSessionCookie } from '@/lib/api';
+import { apiLogout } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n/language-context';
 
 export default function LogoutButton() {
@@ -10,7 +10,6 @@ export default function LogoutButton() {
 
   async function handleClick() {
     await apiLogout();
-    clearSessionCookie();
     router.push('/login');
   }
 

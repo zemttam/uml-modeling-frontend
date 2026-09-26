@@ -6,7 +6,6 @@ export interface AuthResult {
   status: number;
   message?: string;
   username?: string;
-  token?: string;
   lastOpenedProjectId?: string | null;
 }
 
@@ -30,22 +29,6 @@ export interface ProjectListResult {
   status: number;
   message?: string;
   projects?: Project[];
-}
-
-// The API sets its session cookie on its own (cross-site) domain, so the
-// Next.js server components can never read it from the frontend origin.
-// Auth responses therefore also return the raw token, which the client
-// mirrors into this non-httpOnly cookie for server-side forwarding.
-export function setSessionCookie(token: string): void {
-  if (typeof document !== 'undefined') {
-    document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
-  }
-}
-
-export function clearSessionCookie(): void {
-  if (typeof document !== 'undefined') {
-    document.cookie = 'token=; path=/; max-age=0';
-  }
 }
 
 async function request<T>(
@@ -298,23 +281,58 @@ async function serverRequest(
   path: string,
   cookie?: string,
 ): Promise<Record<string, unknown> | null> {
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
-      cache: 'no-store',
-    });
-    if (res.status !== 200) {
-      return null;
-    }
-    return (await res.json()) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  const http = await import('http');
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: new URL(API_URL).hostname,
+        port: new URL(API_URL).port,
+        path,
+        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            resolve(
+              res.statusCode === 200 ? (JSON.parse(body) as Record<string, unknown>) : null,
+            );
+          } catch {
+            resolve(null);
+          }
+        });
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.end();
+  });
 }
 
 export async function apiMe(cookie?: string): Promise<string | null> {
-  const data = (await serverRequest('/auth/me', cookie)) as
-    | { username?: string }
-    | null;
-  return data?.username ?? null;
+  const http = await import('http');
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: new URL(API_URL).hostname,
+        port: new URL(API_URL).port,
+        path: '/auth/me',
+        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body) as { username?: string };
+            resolve(res.statusCode === 200 ? data.username ?? null : null);
+          } catch {
+            resolve(null);
+          }
+        });
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.end();
+  });
 }

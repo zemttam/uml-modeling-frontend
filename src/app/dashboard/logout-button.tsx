@@ -1,15 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { apiLogout } from '@/lib/api';
+import { clearToken } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n/language-context';
 
 export default function LogoutButton() {
   const router = useRouter();
   const { t } = useLanguage();
 
-  async function handleClick() {
-    await apiLogout();
+  function handleClick() {
+    clearToken();
     router.push('/login');
   }
 

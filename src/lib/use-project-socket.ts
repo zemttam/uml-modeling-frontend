@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { API_URL } from './api';
+import { API_URL, getToken } from './api';
 import {
   DIAGRAM_EVENT,
   DiagramDocument,
@@ -15,6 +15,8 @@ export interface ProjectSocket {
   diagram: DiagramDocument;
   presence: number;
   connected: boolean;
+  /** true when the last connection attempt failed (e.g. missing/invalid token) */
+  connectError: boolean;
   sendOp: (op: DiagramOp) => void;
   forceSave: () => void;
   /** element ids locked by other users (own lock excluded) */
@@ -27,12 +29,12 @@ export interface ProjectSocket {
   unlockElement: (id: string) => void;
 }
 
-// Connects to the backend diagrams Socket.IO namespace with credentials,
-// joins the project room, applies inbound ops to local state, emits local
-// ops, tracks live presence, and exposes a force-save method. Also manages
-// per-element session locks: optimistic acquire, denial handling, and
-// tracking of which locks other users hold. Reconnects when projectId
-// changes.
+// Connects to the backend diagrams Socket.IO namespace with the session
+// JWT in the connection auth payload, joins the project room, applies
+// inbound ops to local state, emits local ops, tracks live presence,
+// and exposes a force-save method. Also manages per-element session
+// locks: optimistic acquire, denial handling, and tracking of which
+// locks other users hold. Reconnects when projectId changes.
 export function useProjectSocket(
   projectId: string,
   onLockDenied?: (elementId: string) => void,
@@ -40,6 +42,7 @@ export function useProjectSocket(
   const [diagram, setDiagram] = useState<DiagramDocument>(emptyDiagram);
   const [presence, setPresence] = useState(0);
   const [connected, setConnected] = useState(false);
+  const [connectError, setConnectError] = useState(false);
   const [allLocked, setAllLocked] = useState<Set<string>>(new Set());
   const [heldLockId, setHeldLockId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -56,7 +59,7 @@ export function useProjectSocket(
 
   useEffect(() => {
     const socket = io(`${API_URL}/diagrams`, {
-      withCredentials: true,
+      auth: { token: getToken() },
       transports: ['polling', 'websocket'],
     });
     socketRef.current = socket;
@@ -67,10 +70,14 @@ export function useProjectSocket(
 
     socket.on('connect', () => {
       setConnected(true);
+      setConnectError(false);
       socket.emit(DIAGRAM_EVENT.JOIN, { projectId });
     });
     socket.on('disconnect', () => setConnected(false));
-    socket.on('connect_error', () => setConnected(false));
+    socket.on('connect_error', () => {
+      setConnected(false);
+      setConnectError(true);
+    });
     socket.on(DIAGRAM_EVENT.STATE, (doc: DiagramDocument) => {
       setDiagram(doc ?? emptyDiagram());
     });
@@ -138,6 +145,7 @@ export function useProjectSocket(
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
+      setConnectError(false);
       setPresence(0);
       setAllLocked(new Set());
       setHeldLockId(null);
@@ -197,6 +205,7 @@ export function useProjectSocket(
     diagram,
     presence,
     connected,
+    connectError,
     sendOp,
     forceSave,
     lockedIds,

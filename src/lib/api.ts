@@ -1,12 +1,45 @@
 const rawUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3030';
 export const API_URL = rawUrl.startsWith('http') ? rawUrl : `http://${rawUrl}`;
 
+const TOKEN_STORAGE_KEY = 'token';
+
+// localStorage-backed session token helpers. The JWT is stored in
+// localStorage (invisible to server components) and attached to every
+// request as an Authorization Bearer header.
+export function getToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setToken(token: string): void {
+  window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearToken(): void {
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+function authHeaders(json: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (json) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export interface AuthResult {
   ok: boolean;
   status: number;
   message?: string;
   username?: string;
   lastOpenedProjectId?: string | null;
+  token?: string;
 }
 
 export interface ProjectResult {
@@ -39,13 +72,12 @@ async function request<T>(
   try {
     const res = await fetch(`${API_URL}${path}`, {
       method,
-      headers:
-        method === 'POST' || method === 'PATCH'
-          ? { 'Content-Type': 'application/json' }
-          : undefined,
-      credentials: 'include',
+      headers: authHeaders(method === 'POST' || method === 'PATCH'),
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401) {
+      clearToken();
+    }
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, ...data } as T;
   } catch {
@@ -65,6 +97,10 @@ export function apiLogin(username: string, password: string): Promise<AuthResult
   return post('/auth/login', { username, password });
 }
 
+export function apiMe(): Promise<AuthResult> {
+  return request<AuthResult>('/auth/me', 'GET');
+}
+
 export function apiCreateProject(name: string): Promise<ProjectResult> {
   return request<ProjectResult>('/projects', 'POST', { name });
 }
@@ -75,10 +111,6 @@ export function apiListProjects(): Promise<ProjectListResult> {
 
 export function apiGetProject(id: string): Promise<ProjectResult> {
   return request<ProjectResult>(`/projects/${id}`, 'GET');
-}
-
-export function apiLogout(): Promise<AuthResult> {
-  return request<AuthResult>('/auth/logout', 'POST');
 }
 
 export function apiRenameProject(
@@ -102,9 +134,12 @@ export async function apiImportProjectXmi(
     form.append('file', file);
     const res = await fetch(`${API_URL}/projects/import`, {
       method: 'POST',
-      credentials: 'include',
+      headers: authHeaders(false),
       body: form,
     });
+    if (res.status === 401) {
+      clearToken();
+    }
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, ...data } as ProjectResult;
   } catch {
@@ -144,10 +179,13 @@ async function postForm<T>(
   try {
     const res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      credentials: 'include',
+      headers: authHeaders(false),
       body: form,
       signal: controller?.signal,
     });
+    if (res.status === 401) {
+      clearToken();
+    }
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, ...data } as T;
   } catch {
@@ -198,8 +236,11 @@ export async function apiDownloadProjectXmi(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/projects/${id}/xmi`, {
     method: 'GET',
-    credentials: 'include',
+    headers: authHeaders(false),
   });
+  if (res.status === 401) {
+    clearToken();
+  }
   if (!res.ok) {
     throw new Error(`export failed (${res.status})`);
   }
@@ -227,9 +268,12 @@ export async function apiDownloadProjectSpringBoot(
   try {
     const res = await fetch(`${API_URL}/projects/${id}/spring-boot`, {
       method: 'GET',
-      credentials: 'include',
+      headers: authHeaders(false),
       signal: controller.signal,
     });
+    if (res.status === 401) {
+      clearToken();
+    }
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as {
         message?: string;
@@ -250,89 +294,4 @@ export async function apiDownloadProjectSpringBoot(
   } finally {
     clearTimeout(timer);
   }
-}
-
-export async function apiGetProjectServer(
-  id: string,
-  cookie?: string,
-): Promise<ProjectResult> {
-  const data = await serverRequest(`/projects/${id}`, cookie);
-  if (!data) {
-    return { ok: false, status: 0, message: 'project not found' };
-  }
-  return {
-    ok: true,
-    status: 200,
-    id: data.id as string,
-    name: data.name as string,
-  };
-}
-
-export async function apiLastOpenedProjectId(
-  cookie?: string,
-): Promise<string | null> {
-  const data = (await serverRequest('/auth/me', cookie)) as
-    | { lastOpenedProjectId?: string | null }
-    | null;
-  return data?.lastOpenedProjectId ?? null;
-}
-
-async function serverRequest(
-  path: string,
-  cookie?: string,
-): Promise<Record<string, unknown> | null> {
-  const http = await import('http');
-  return new Promise((resolve) => {
-    const req = http.request(
-      {
-        host: new URL(API_URL).hostname,
-        port: new URL(API_URL).port,
-        path,
-        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => {
-          try {
-            resolve(
-              res.statusCode === 200 ? (JSON.parse(body) as Record<string, unknown>) : null,
-            );
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-    req.on('error', () => resolve(null));
-    req.end();
-  });
-}
-
-export async function apiMe(cookie?: string): Promise<string | null> {
-  const http = await import('http');
-  return new Promise((resolve) => {
-    const req = http.request(
-      {
-        host: new URL(API_URL).hostname,
-        port: new URL(API_URL).port,
-        path: '/auth/me',
-        headers: cookie ? { Cookie: `token=${cookie}` } : undefined,
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(body) as { username?: string };
-            resolve(res.statusCode === 200 ? data.username ?? null : null);
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-    req.on('error', () => resolve(null));
-    req.end();
-  });
 }

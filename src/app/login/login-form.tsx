@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { apiLogin } from '@/lib/api';
+import { apiLogin, setToken } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n/language-context';
 import LanguageToggle from '@/components/language-toggle';
 
@@ -19,7 +19,8 @@ export default function LoginForm() {
     e.preventDefault();
     setError('');
     const result = await apiLogin(username, password);
-    if (result.ok) {
+    if (result.ok && result.token) {
+      setToken(result.token);
       const target = result.lastOpenedProjectId
         ? `/project/${result.lastOpenedProjectId}`
         : '/dashboard';

@@ -22,6 +22,7 @@ export type PrevSnapshot =
       element: ClassElement | null;
       relationship: RelationshipElement | null;
       cascaded: RelationshipElement[];
+      cascadedElements: ClassElement[];
     }
   | { kind: 'meta'; packageName: string; diagramName: string };
 
@@ -149,11 +150,15 @@ function buildEntry(op: DiagramOp, prev: PrevSnapshot): HistoryEntry {
       };
     }
     case 'delete': {
-      // Inverse restores the deleted item and, for a class, every
-      // relationship the reducer cascade removed with it.
+      // Inverse restores the deleted items: the directly deleted element or
+      // relationship, every relationship the reducer cascade removed with a
+      // deleted class, and every association-class box the cascade removed.
       const inverse: DiagramOp[] = [];
       if (prev.kind === 'delete') {
         if (prev.element) inverse.push({ op: 'upsertElement', element: prev.element });
+        for (const el of prev.cascadedElements) {
+          inverse.push({ op: 'upsertElement', element: el });
+        }
         if (prev.relationship) {
           inverse.push({
             op: 'upsertRelationship',
@@ -173,12 +178,16 @@ function buildEntry(op: DiagramOp, prev: PrevSnapshot): HistoryEntry {
 
 export interface DiagramHistory {
   commit: (op: DiagramOp, prev: PrevSnapshot) => void;
+  /** one history entry for a group of ops (e.g. association-class creation) */
+  commitGroup: (ops: DiagramOp[], inverse: DiagramOp[]) => void;
   beginMove: (id: string, x: number, y: number) => void;
   endMove: (x: number, y: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  /** clears both stacks (used when the server replaces the whole document) */
+  reset: () => void;
 }
 
 // Local-only undo/redo layered on the existing op pipeline: new local actions
@@ -233,6 +242,17 @@ export function useDiagramHistory(
     [pushEntry],
   );
 
+  // Composite actions (the association-class creation emits an
+  // upsertRelationship plus an upsertElement) commit as one entry: one
+  // undo replays the whole inverse group, one redo the whole forward group.
+  const commitGroup = useCallback(
+    (ops: DiagramOp[], inverse: DiagramOp[]) => {
+      pushEntry({ inverse, forward: ops, key: null, time: Date.now() });
+      ops.forEach((op) => sendOpRef.current(op));
+    },
+    [pushEntry],
+  );
+
   const beginMove = useCallback((id: string, x: number, y: number) => {
     // Record the pre-drag position; intermediate/live move ops stream through
     // sendOp as usual, and endMove commits exactly one history entry.
@@ -271,6 +291,15 @@ export function useDiagramHistory(
     syncCounts();
   }, [syncCounts]);
 
+  // Full reset on a server-side document replacement (e.g. XMI import):
+  // pre-import history can never resurrect replaced content.
+  const reset = useCallback(() => {
+    undoStack.current = [];
+    redoStack.current = [];
+    pendingMove.current = null;
+    syncCounts();
+  }, [syncCounts]);
+
   // Global shortcuts: Ctrl+Z undo; Ctrl+Y and Ctrl+Shift+Z redo. Skipped when
   // focus is in a text input/textarea/contenteditable so the browser's native
   // text undo/redo applies there.
@@ -301,11 +330,13 @@ export function useDiagramHistory(
 
   return {
     commit,
+    commitGroup,
     beginMove,
     endMove,
     undo,
     redo,
     canUndo: counts.undo > 0,
     canRedo: counts.redo > 0,
+    reset,
   };
 }

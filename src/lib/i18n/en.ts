@@ -64,6 +64,14 @@ export const en = {
   'toolbar.exportSpringBusy': 'Generating Spring Boot project…',
   'toolbar.export': 'Export',
   'toolbar.exporting': 'Exporting…',
+  'toolbar.import': 'Import',
+  'toolbar.importTitle':
+    'Import an XMI file into this project, replacing its diagram',
+  'toolbar.importConfirm':
+    'All the contents of this diagram will be replaced. This cannot be undone. Continue?',
+  'toolbar.importOk': 'Okay',
+  'toolbar.importCancel': 'Cancel',
+  'toolbar.importing': 'Importing…',
   'toolbar.undo': 'Undo',
   'toolbar.undoTitle': 'Undo (Ctrl+Z)',
   'toolbar.redo': 'Redo',
@@ -80,6 +88,8 @@ export const en = {
   'palette.tool.generalization': 'Generalize',
   'palette.tool.composition': 'Compose',
   'palette.tool.aggregation': 'Aggregate',
+  'palette.tool.realization': 'Realize',
+  'palette.tool.associationClass': 'Association Class',
   'palette.classTooltip': '{name} — drag onto the canvas',
   'palette.hintConnect': 'Click source, then target class.',
   'palette.hintClass': 'Drag Class onto the canvas.',
@@ -102,6 +112,7 @@ export const en = {
   'properties.sourceMultiplicity': 'Source multiplicity',
   'properties.targetMultiplicity': 'Target multiplicity',
   'properties.multiplicityPlaceholder': 'e.g. 1, 0..*, *',
+  'properties.none': 'None',
   'properties.switchDirection': 'Switch direction',
   'properties.selectElement': 'Select an element to edit its properties.',
 } as const;

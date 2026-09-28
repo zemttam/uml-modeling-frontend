@@ -24,7 +24,7 @@ export const es: EsDictionary = {
   'dashboard.nameRequired': 'el nombre es obligatorio',
   'dashboard.ok': 'Aceptar',
   'dashboard.importTitle': 'Importar un archivo XMI',
-  'dashboard.importAction': 'Importar',
+  'dashboard.importAction': 'Importar XMI',
   'dashboard.selectXmiFile': 'selecciona un archivo XMI',
   'dashboard.aiCreatorTitle': 'Creador IA',
   'dashboard.aiPromptPlaceholder':
@@ -64,6 +64,14 @@ export const es: EsDictionary = {
   'toolbar.exportSpringBusy': 'Generando proyecto Spring Boot…',
   'toolbar.export': 'Exportar XMI',
   'toolbar.exporting': 'Exportando…',
+  'toolbar.import': 'Importar XMI',
+  'toolbar.importTitle':
+    'Importa un archivo XMI a este proyecto, reemplazando su diagrama',
+  'toolbar.importConfirm':
+    'Todo el contenido de este diagrama se reemplazará. Esto no se puede deshacer. ¿Desea continuar?',
+  'toolbar.importOk': 'Aceptar',
+  'toolbar.importCancel': 'Cancelar',
+  'toolbar.importing': 'Importando…',
   'toolbar.undo': 'Deshacer',
   'toolbar.undoTitle': 'Deshacer (Ctrl+Z)',
   'toolbar.redo': 'Rehacer',
@@ -79,6 +87,8 @@ export const es: EsDictionary = {
   'palette.tool.generalization': 'Generalizar',
   'palette.tool.composition': 'Componer',
   'palette.tool.aggregation': 'Agregar',
+  'palette.tool.realization': 'Realizar',
+  'palette.tool.associationClass': 'Clase de asociación',
   'palette.classTooltip': '{name} — arrástralo al lienzo',
   'palette.hintConnect': 'Haz clic en el origen y luego en la clase destino.',
   'palette.hintClass': 'Arrastra Clase al lienzo.',
@@ -100,6 +110,7 @@ export const es: EsDictionary = {
   'properties.sourceMultiplicity': 'Multiplicidad del origen',
   'properties.targetMultiplicity': 'Multiplicidad del destino',
   'properties.multiplicityPlaceholder': 'p. ej. 1, 0..*, *',
+  'properties.none': 'Ninguno',
   'properties.switchDirection': 'Cambiar dirección',
   'properties.selectElement': 'Selecciona un elemento para editar sus propiedades.',
 };

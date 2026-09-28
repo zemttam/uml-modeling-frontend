@@ -6,7 +6,8 @@ export type RelationshipKind =
   | 'association'
   | 'generalization'
   | 'composition'
-  | 'aggregation';
+  | 'aggregation'
+  | 'realization';
 
 export interface ClassAttribute {
   id: string;
@@ -38,6 +39,9 @@ export interface RelationshipElement {
   targetId: string;
   sourceMultiplicity: string;
   targetMultiplicity: string;
+  // Association-class tie: id of the class element attached to this
+  // association. Absent on every other relationship.
+  associationClassId?: string;
 }
 
 export interface DiagramDocument {
@@ -77,6 +81,8 @@ export const PALETTE_TOOLS = [
   'generalization',
   'composition',
   'aggregation',
+  'realization',
+  'associationClass',
 ] as const;
 export type PaletteTool = (typeof PALETTE_TOOLS)[number];
 
@@ -86,6 +92,8 @@ export const TOOL_LABELS: Record<PaletteTool, string> = {
   generalization: 'Generalize',
   composition: 'Compose',
   aggregation: 'Aggregate',
+  realization: 'Realize',
+  associationClass: 'Association Class',
 };
 
 export function newId(): string {

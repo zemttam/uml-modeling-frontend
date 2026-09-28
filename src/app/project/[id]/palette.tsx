@@ -14,6 +14,8 @@ const TOOL_LABEL_KEYS: Record<PaletteTool, TranslationKey> = {
   generalization: 'palette.tool.generalization',
   composition: 'palette.tool.composition',
   aggregation: 'palette.tool.aggregation',
+  realization: 'palette.tool.realization',
+  associationClass: 'palette.tool.associationClass',
 };
 
 interface PaletteProps {
@@ -35,6 +37,8 @@ const TOOL_GLYPHS: Record<PaletteTool, string> = {
   generalization: '▷',
   composition: '◆',
   aggregation: '◇',
+  realization: '⇢',
+  associationClass: '▢◆',
 };
 
 // Left palette of class-diagram tools, shown as a two-column grid of icon

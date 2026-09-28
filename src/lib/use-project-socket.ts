@@ -38,6 +38,7 @@ export interface ProjectSocket {
 export function useProjectSocket(
   projectId: string,
   onLockDenied?: (elementId: string) => void,
+  onStateReset?: () => void,
 ): ProjectSocket {
   const [diagram, setDiagram] = useState<DiagramDocument>(emptyDiagram);
   const [presence, setPresence] = useState(0);
@@ -48,6 +49,7 @@ export function useProjectSocket(
   const socketRef = useRef<Socket | null>(null);
   const heldLockRef = useRef<string | null>(null);
   const deniedCbRef = useRef(onLockDenied);
+  const stateResetCbRef = useRef(onStateReset);
   // Serialized local ops awaiting their own server echo. The gateway
   // broadcasts every op to the whole room including the sender; re-applying
   // an echo here could clobber newer local state (e.g. a stale upsert
@@ -56,6 +58,7 @@ export function useProjectSocket(
   // skip them and only apply ops from other sessions.
   const pendingEchoes = useRef<string[]>([]);
   deniedCbRef.current = onLockDenied;
+  stateResetCbRef.current = onStateReset;
 
   useEffect(() => {
     const socket = io(`${API_URL}/diagrams`, {
@@ -79,7 +82,16 @@ export function useProjectSocket(
       setConnectError(true);
     });
     socket.on(DIAGRAM_EVENT.STATE, (doc: DiagramDocument) => {
+      // STATE is the authoritative full document: on join and on a
+      // replace-in-place import it is a full reset. Drop any pending echo
+      // queue, all element-lock state, and the local undo/redo history so no
+      // stale op can survive the replacement (imports are not undoable).
+      pendingEchoes.current = [];
+      setAllLocked(new Set());
+      setHeldLockId(null);
+      heldLockRef.current = null;
       setDiagram(doc ?? emptyDiagram());
+      stateResetCbRef.current?.();
     });
     socket.on(DIAGRAM_EVENT.OP, (op: DiagramOp) => {
       const serialized = JSON.stringify(op);

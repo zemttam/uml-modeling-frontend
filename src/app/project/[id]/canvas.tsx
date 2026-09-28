@@ -39,17 +39,23 @@ function borderPoint(
   return { x: cx + dx * scale, y: cy + dy * scale };
 }
 
-function markerFor(kind: RelationshipKind): {
+// End decorations per kind. The diamond sits at the target (whole) end for
+// composition/aggregation; realization draws a dashed line with a hollow
+// triangle at the target (supplier) end.
+function lineStyleFor(kind: RelationshipKind): {
   start?: string;
   end?: string;
+  dashed?: boolean;
 } {
   switch (kind) {
     case 'generalization':
       return { end: 'url(#m-arrow)' };
     case 'composition':
-      return { start: 'url(#m-diamond-filled)' };
+      return { end: 'url(#m-diamond-filled)' };
     case 'aggregation':
-      return { start: 'url(#m-diamond-hollow)' };
+      return { end: 'url(#m-diamond-hollow)' };
+    case 'realization':
+      return { end: 'url(#m-triangle-hollow)', dashed: true };
     default:
       return {};
   }
@@ -204,7 +210,7 @@ export default function Canvas({
           <marker
             id="m-diamond-filled"
             viewBox="0 0 16 10"
-            refX="1"
+            refX="15"
             refY="5"
             markerWidth="16"
             markerHeight="10"
@@ -215,13 +221,24 @@ export default function Canvas({
           <marker
             id="m-diamond-hollow"
             viewBox="0 0 16 10"
-            refX="1"
+            refX="15"
             refY="5"
             markerWidth="16"
             markerHeight="10"
             orient="auto"
           >
             <path d="M1,5 L8,1 L15,5 L8,9 z" fill="var(--node-bg)" stroke="var(--node-border)" />
+          </marker>
+          <marker
+            id="m-triangle-hollow"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerWidth="13"
+            markerHeight="13"
+            orient="auto-start-reverse"
+          >
+            <path d="M0,0 L11,6 L0,12 z" fill="var(--node-bg)" stroke="var(--node-border)" />
           </marker>
         </defs>
 
@@ -235,9 +252,35 @@ export default function Canvas({
           const tc = { x: tgt.x + BOX_W / 2, y: tgt.y + tgtH / 2 };
           const sp = borderPoint(sc.x, sc.y, srcH, tc.x, tc.y);
           const tp = borderPoint(tc.x, tc.y, tgtH, sc.x, sc.y);
-          const markers = markerFor(rel.kind);
+          const style = lineStyleFor(rel.kind);
           const mid = { x: (sp.x + tp.x) / 2, y: (sp.y + tp.y) / 2 };
           const isSelected = selectedId === rel.id;
+          // Multiplicity label anchor: a short distance along the line from
+          // `from` toward `to`, plus a perpendicular offset so the text sits
+          // beside the line rather than on it. `extraAlong` pushes the target
+          // label past the diamond decoration drawn at the target end.
+          const labelPos = (
+            from: { x: number; y: number },
+            to: { x: number; y: number },
+            extraAlong = 0,
+          ) => {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const along = Math.min(len * 0.15, 24) + extraAlong;
+            const px = -dy / len;
+            const py = dx / len;
+            return {
+              x: from.x + (dx / len) * along + px * 16,
+              y: from.y + (dy / len) * along + py * 16,
+            };
+          };
+          const srcLabel = rel.sourceMultiplicity
+            ? labelPos(sp, tp)
+            : null;
+          const tgtLabel = rel.targetMultiplicity
+            ? labelPos(tp, sp, 12)
+            : null;
           return (
             <g
               key={rel.id}
@@ -254,8 +297,9 @@ export default function Canvas({
                 y2={tp.y}
                 stroke={isSelected ? 'var(--selection-color)' : 'var(--line-stroke)'}
                 strokeWidth={isSelected ? 2.5 : 1.5}
-                markerStart={markers.start}
-                markerEnd={markers.end}
+                strokeDasharray={style.dashed ? '6 4' : undefined}
+                markerStart={style.start}
+                markerEnd={style.end}
               />
               <line
                 x1={sp.x}
@@ -275,7 +319,69 @@ export default function Canvas({
                   {rel.name}
                 </text>
               )}
+              {srcLabel && (
+                <text
+                  x={srcLabel.x}
+                  y={srcLabel.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-[var(--project-text-secondary)] text-[11px]"
+                >
+                  {rel.sourceMultiplicity}
+                </text>
+              )}
+              {tgtLabel && (
+                <text
+                  x={tgtLabel.x}
+                  y={tgtLabel.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-[var(--project-text-secondary)] text-[11px]"
+                >
+                  {rel.targetMultiplicity}
+                </text>
+              )}
             </g>
+          );
+        })}
+
+        {diagram.relationships.map((rel) => {
+          // Dashed tie line from an association-class box to its
+          // association's midpoint, following moved boxes.
+          if (!rel.associationClassId) return null;
+          const src = diagram.elements.find((e) => e.id === rel.sourceId);
+          const tgt = diagram.elements.find((e) => e.id === rel.targetId);
+          const box = diagram.elements.find(
+            (e) => e.id === rel.associationClassId,
+          );
+          if (!src || !tgt || !box) return null;
+          const srcH = boxHeight(src);
+          const tgtH = boxHeight(tgt);
+          const sc = { x: src.x + BOX_W / 2, y: src.y + srcH / 2 };
+          const tc = { x: tgt.x + BOX_W / 2, y: tgt.y + tgtH / 2 };
+          const sp = borderPoint(sc.x, sc.y, srcH, tc.x, tc.y);
+          const tp = borderPoint(tc.x, tc.y, tgtH, sc.x, sc.y);
+          const mid = { x: (sp.x + tp.x) / 2, y: (sp.y + tp.y) / 2 };
+          const boxH = boxHeight(box);
+          const anchor = borderPoint(
+            box.x + BOX_W / 2,
+            box.y + boxH / 2,
+            boxH,
+            mid.x,
+            mid.y,
+          );
+          const isSelected = selectedId === rel.id;
+          return (
+            <line
+              key={`tie-${rel.id}`}
+              x1={anchor.x}
+              y1={anchor.y}
+              x2={mid.x}
+              y2={mid.y}
+              stroke={isSelected ? 'var(--selection-color)' : 'var(--line-stroke)'}
+              strokeWidth={isSelected ? 2 : 1}
+              strokeDasharray="4 4"
+            />
           );
         })}
 

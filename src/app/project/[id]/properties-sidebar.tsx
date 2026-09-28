@@ -9,7 +9,49 @@ import {
   newId,
 } from '@/lib/diagram-types';
 import { useLanguage } from '@/lib/i18n/language-context';
+import {
+  ATTRIBUTE_TYPE_OPTIONS,
+  MULTIPLICITY_OPTIONS,
+} from '@/lib/diagram-options';
 import './theme.css';
+
+// Native fixed-option dropdown: notation options untranslated, plus a
+// translated "None" option (empty value clears the field), plus the stored
+// value as one extra option when it is outside the fixed list so it is
+// neither hidden nor discarded.
+function OptionSelect({
+  value,
+  options,
+  noneLabel,
+  onChange,
+  className,
+}: {
+  value: string;
+  options: readonly string[];
+  noneLabel: string;
+  onChange: (value: string) => void;
+  className: string;
+}) {
+  const extra =
+    value !== '' && !options.includes(value) ? (
+      <option value={value}>{value}</option>
+    ) : null;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+    >
+      <option value="">{noneLabel}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+      {extra}
+    </select>
+  );
+}
 
 function attributeHasContent(a: ClassAttribute): boolean {
   return a.name.trim().length > 0 || a.type.trim().length > 0;
@@ -118,11 +160,11 @@ function ClassForm({
         onChange={(e) => onChange({ name: e.target.value })}
         className="w-24 rounded border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--input-text)] px-1 py-0.5 text-xs"
       />
-      <input
-        type="text"
-        placeholder={t('properties.typePlaceholder')}
+      <OptionSelect
         value={row.type}
-        onChange={(e) => onChange({ type: e.target.value })}
+        options={ATTRIBUTE_TYPE_OPTIONS}
+        noneLabel={t('properties.none')}
+        onChange={(type) => onChange({ type })}
         className="w-20 rounded border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--input-text)] px-1 py-0.5 text-xs"
       />
       <button
@@ -328,24 +370,24 @@ export default function PropertiesSidebar({
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-[var(--project-text-secondary)]">{t('properties.sourceMultiplicity')}</span>
-        <input
-          type="text"
-          placeholder={t('properties.multiplicityPlaceholder')}
+        <OptionSelect
           value={rel.sourceMultiplicity}
-          onChange={(e) =>
-            onUpdateRelationship({ ...rel, sourceMultiplicity: e.target.value })
+          options={MULTIPLICITY_OPTIONS}
+          noneLabel={t('properties.none')}
+          onChange={(sourceMultiplicity) =>
+            onUpdateRelationship({ ...rel, sourceMultiplicity })
           }
           className="rounded border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--input-text)] px-2 py-1"
         />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-[var(--project-text-secondary)]">{t('properties.targetMultiplicity')}</span>
-        <input
-          type="text"
-          placeholder={t('properties.multiplicityPlaceholder')}
+        <OptionSelect
           value={rel.targetMultiplicity}
-          onChange={(e) =>
-            onUpdateRelationship({ ...rel, targetMultiplicity: e.target.value })
+          options={MULTIPLICITY_OPTIONS}
+          noneLabel={t('properties.none')}
+          onChange={(targetMultiplicity) =>
+            onUpdateRelationship({ ...rel, targetMultiplicity })
           }
           className="rounded border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--input-text)] px-2 py-1"
         />

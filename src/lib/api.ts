@@ -147,6 +147,34 @@ export async function apiImportProjectXmi(
   }
 }
 
+// Uploads an XMI file to `POST /projects/:id/import`, replacing the existing
+// project's diagram in place. Returns the updated { id, name }, or throws
+// the backend error message verbatim.
+export async function apiImportXmiIntoProject(
+  projectId: string,
+  file: File,
+): Promise<{ id: string; name: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_URL}/projects/${projectId}/import`, {
+    method: 'POST',
+    headers: authHeaders(false),
+    body: form,
+  });
+  if (res.status === 401) {
+    clearToken();
+  }
+  const data = (await res.json().catch(() => ({}))) as {
+    id?: string;
+    name?: string;
+    message?: string;
+  };
+  if (!res.ok) {
+    throw new Error(data.message ?? 'could not import project');
+  }
+  return { id: data.id ?? projectId, name: data.name ?? '' };
+}
+
 export type AiGenerateResult = ProjectResult;
 
 export interface AiTranscribeResult {
